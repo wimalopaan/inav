@@ -132,7 +132,9 @@ extern uint8_t __config_end;
 #endif
 
 // CRSF sensor input on a dedicated UART — excluded from flash-constrained targets
-#if defined(USE_SERIALRX_CRSF) && (!defined(MCU_FLASH_SIZE) || MCU_FLASH_SIZE > 512)
+//#if defined(USE_SERIALRX_CRSF) && (!defined(MCU_FLASH_SIZE) || MCU_FLASH_SIZE > 512)
+#if defined(USE_SERIALRX_CRSF) 
+#warning "CRSF SENSOR"
 #define USE_CRSF_SENSOR_INPUT
 #define USE_BATTERY_SENSOR_CRSF
 #if defined(USE_GPS)
