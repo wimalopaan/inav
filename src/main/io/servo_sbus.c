@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <math.h>
+#include <string.h>
 
 #include "platform.h"
 
@@ -44,92 +45,122 @@
 #define SERVO_SBUS_UART_BAUD            100000
 #define SERVO_SBUS_OPTIONS              (SBUS_PORT_OPTIONS | SERIAL_INVERTED | SERIAL_UNIDIR)
 
-static serialPort_t * servoSbusPort = NULL;
-static sbusFrame_t sbusFrame;
+#define MAX_SBUS_PORT_COUNT 2
+
+// all sbus instances have their own fram buffer.
+// This is not strictly neccessary in the first place (all should output the same data)
+// But maybe in the future ... ;-)
+
+typedef struct sbusPort_s {
+  serialPort_t *port; 
+  sbusFrame_t sbusFrame;
+} sbusPort_t;
+
+static sbusPort_t sbusPorts[MAX_SBUS_PORT_COUNT];
+
+static void sbusServoSetFrameValue(uint8_t const index, uint16_t const value, sbusFrame_t* const frame)
+{
+      if (!frame) {
+        return;
+      }
+      switch(index) {
+          case 0: frame->channels.chan0 = sbusEncodeChannelValue(value); break;
+          case 1: frame->channels.chan1 = sbusEncodeChannelValue(value); break;
+          case 2: frame->channels.chan2 = sbusEncodeChannelValue(value); break;
+          case 3: frame->channels.chan3 = sbusEncodeChannelValue(value); break;
+          case 4: frame->channels.chan4 = sbusEncodeChannelValue(value); break;
+          case 5: frame->channels.chan5 = sbusEncodeChannelValue(value); break;
+          case 6: frame->channels.chan6 = sbusEncodeChannelValue(value); break;
+          case 7: frame->channels.chan7 = sbusEncodeChannelValue(value); break;
+          case 8: frame->channels.chan8 = sbusEncodeChannelValue(value); break;
+          case 9: frame->channels.chan9 = sbusEncodeChannelValue(value); break;
+          case 10: frame->channels.chan10 = sbusEncodeChannelValue(value); break;
+          case 11: frame->channels.chan11 = sbusEncodeChannelValue(value); break;
+          case 12: frame->channels.chan12 = sbusEncodeChannelValue(value); break;
+          case 13: frame->channels.chan13 = sbusEncodeChannelValue(value); break;
+          case 14: frame->channels.chan14 = sbusEncodeChannelValue(value); break;
+          case 15: frame->channels.chan15 = sbusEncodeChannelValue(value); break;
+          case 16: frame->channels.flags = value > PWM_RANGE_MIDDLE ? (frame->channels.flags | SBUS_FLAG_CHANNEL_DG1) : (frame->channels.flags & ~SBUS_FLAG_CHANNEL_DG1) ; break;
+          case 17: frame->channels.flags = value > PWM_RANGE_MIDDLE ? (frame->channels.flags | SBUS_FLAG_CHANNEL_DG2) : (frame->channels.flags & ~SBUS_FLAG_CHANNEL_DG2) ; break;
+          default:
+              break;
+      }
+}
+
+static void resetSbusPort(sbusPort_t * const sbusPortToReset, serialPort_t * const serialPort)
+{
+    if (!sbusPortToReset) {
+      return;
+    }
+    memset(sbusPortToReset, 0, sizeof(sbusPort_t));
+    sbusPortToReset->port = serialPort;
+}
+
+static void clearSbusFrame(sbusFrame_t* const frame) {
+    if (!frame) {
+      return;
+    }
+    frame->syncByte = 0x0F;
+    frame->channels.flags = 0;
+    for(uint8_t i = 0; i < 16; ++i) {
+      sbusServoSetFrameValue(i, 1500, frame);
+    }
+    frame->endByte = 0x00;
+}
+
+static void sbusServoAllocatePorts(void)
+{
+    uint8_t portIndex = 0;
+    const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_SERVO_SERIAL);
+    while (portConfig && portIndex < MAX_SBUS_PORT_COUNT) {
+        sbusPort_t * const sbusPort = &sbusPorts[portIndex];
+        if (sbusPort->port) {
+            portIndex++;
+            continue;
+        }
+
+        serialPort_t * const serialPort = openSerialPort(portConfig->identifier, FUNCTION_SERVO_SERIAL, NULL, NULL, SERVO_SBUS_UART_BAUD, MODE_TX, SERVO_SBUS_OPTIONS);
+        if (serialPort) {
+            resetSbusPort(sbusPort, serialPort);
+            clearSbusFrame(&sbusPort->sbusFrame);
+            portIndex++;
+        }
+
+        portConfig = findNextSerialPortConfig(FUNCTION_SERVO_SERIAL);
+    }
+}
 
 bool sbusServoInitialize(void)
 {
-    serialPortConfig_t * portConfig;
-
-    // Avoid double initialization
-    if (servoSbusPort) {
-        return true;
-    }
-
-    portConfig = findSerialPortConfig(FUNCTION_SERVO_SERIAL);
-    if (!portConfig) {
-        return false;
-    }
-
-    servoSbusPort = openSerialPort(portConfig->identifier, FUNCTION_SERVO_SERIAL, NULL, NULL, SERVO_SBUS_UART_BAUD, MODE_TX, SERVO_SBUS_OPTIONS);
-    if (!servoSbusPort) {
-        return false;
-    }
-
-    // SBUS V1 magical values
-    sbusFrame.syncByte = 0x0F;
-    sbusFrame.channels.flags = 0;
-    sbusFrame.channels.chan0  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan1  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan2  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan3  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan4  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan5  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan6  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan7  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan8  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan9  = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan10 = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan11 = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan12 = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan13 = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan14 = sbusEncodeChannelValue(1500);
-    sbusFrame.channels.chan15 = sbusEncodeChannelValue(1500);
-    sbusFrame.endByte = 0x00;
-
+    memset(sbusPorts, 0, sizeof(sbusPorts));
+    sbusServoAllocatePorts();
     return true;
 }
 
-void sbusServoUpdate(uint8_t index, uint16_t value)
+void sbusServoUpdate(uint8_t const index, uint16_t const value)
 {
-    switch(index) {
-        case 0: sbusFrame.channels.chan0 = sbusEncodeChannelValue(value); break;
-        case 1: sbusFrame.channels.chan1 = sbusEncodeChannelValue(value); break;
-        case 2: sbusFrame.channels.chan2 = sbusEncodeChannelValue(value); break;
-        case 3: sbusFrame.channels.chan3 = sbusEncodeChannelValue(value); break;
-        case 4: sbusFrame.channels.chan4 = sbusEncodeChannelValue(value); break;
-        case 5: sbusFrame.channels.chan5 = sbusEncodeChannelValue(value); break;
-        case 6: sbusFrame.channels.chan6 = sbusEncodeChannelValue(value); break;
-        case 7: sbusFrame.channels.chan7 = sbusEncodeChannelValue(value); break;
-        case 8: sbusFrame.channels.chan8 = sbusEncodeChannelValue(value); break;
-        case 9: sbusFrame.channels.chan9 = sbusEncodeChannelValue(value); break;
-        case 10: sbusFrame.channels.chan10 = sbusEncodeChannelValue(value); break;
-        case 11: sbusFrame.channels.chan11 = sbusEncodeChannelValue(value); break;
-        case 12: sbusFrame.channels.chan12 = sbusEncodeChannelValue(value); break;
-        case 13: sbusFrame.channels.chan13 = sbusEncodeChannelValue(value); break;
-        case 14: sbusFrame.channels.chan14 = sbusEncodeChannelValue(value); break;
-        case 15: sbusFrame.channels.chan15 = sbusEncodeChannelValue(value); break;
-        case 16: sbusFrame.channels.flags = value > PWM_RANGE_MIDDLE ? (sbusFrame.channels.flags | SBUS_FLAG_CHANNEL_DG1) : (sbusFrame.channels.flags & ~SBUS_FLAG_CHANNEL_DG1) ; break;
-        case 17: sbusFrame.channels.flags = value > PWM_RANGE_MIDDLE ? (sbusFrame.channels.flags | SBUS_FLAG_CHANNEL_DG2) : (sbusFrame.channels.flags & ~SBUS_FLAG_CHANNEL_DG2) ; break;
-        default:
-            break;
+    for(sbusPort_t* sbusPort = &sbusPorts[0]; (sbusPort && (sbusPort != &sbusPorts[MAX_SBUS_PORT_COUNT])); ++sbusPort) {
+      sbusServoSetFrameValue(index, value, &sbusPort->sbusFrame);
     }
 }
 
 void sbusServoSendUpdate(void)
 {
-    // Check if the port is initialized
-    if (!servoSbusPort) {
-        return;
+    for(const sbusPort_t* sbusPort = &sbusPorts[0]; (sbusPort && (sbusPort != &sbusPorts[MAX_SBUS_PORT_COUNT])); ++sbusPort)
+    {
+      if (!sbusPort->port) {
+        continue;
+      }
+      if (!isSerialTransmitBufferEmpty(sbusPort->port)) {
+          continue;
+      }
+      else {
+        const uint8_t * const data =  (const uint8_t *)&sbusPort->sbusFrame;
+        if (data) {
+          serialWriteBuf(sbusPort->port, data, sizeof(sbusFrame_t));
+        }
+      }
     }
-
-    // Skip update if previous one is not yet fully sent
-    // This helps to avoid buffer overflow and evenyually the data corruption
-    if (!isSerialTransmitBufferEmpty(servoSbusPort)) {
-        return;
-    }
-
-    serialWriteBuf(servoSbusPort, (const uint8_t *)&sbusFrame, sizeof(sbusFrame));
 }
 
 #endif
