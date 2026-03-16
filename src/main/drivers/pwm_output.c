@@ -35,6 +35,7 @@
 #include "drivers/pwm_mapping.h"
 #include "drivers/pwm_output.h"
 #include "io/servo_sbus.h"
+#include "io/serial_ddsm210.h"
 #include "sensors/esc_sensor.h"
 
 #include "config/feature.h"
@@ -651,6 +652,14 @@ static void sbusPwmWriteStandard(uint8_t index, uint16_t value)
 }
 #endif
 
+#ifdef USE_DDSM_MOTOR
+static void ddsmPwmWriteStandard(uint8_t index, uint16_t value)
+{
+    pwmServoWriteStandard(index, value);
+    ddsmSet(index, value);
+}
+#endif
+
 void pwmServoPreconfigure(void)
 {
     // Protocol-specific configuration
@@ -670,6 +679,16 @@ void pwmServoPreconfigure(void)
             sbusServoInitialize();
             servoWritePtr = sbusPwmWriteStandard;
             break;
+#endif
+#if defined(USE_DDSM_MOTOR)
+        case SERVO_TYPE_DDSM:
+          ddsmInitialize();
+          servoWritePtr = ddsmSet;
+          break;
+        case SERVO_TYPE_DDSM_PWM:
+          ddsmInitialize();
+          servoWritePtr = ddsmPwmWriteStandard;
+          break;
 #endif
     }
 }

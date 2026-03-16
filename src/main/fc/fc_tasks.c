@@ -72,6 +72,7 @@
 #include "io/osd_dji_hd.h"
 #include "io/displayport_msp_osd.h"
 #include "io/servo_sbus.h"
+#include "io/serial_ddsm210.h"
 #include "io/adsb.h"
 
 #include "msp/msp_serial.h"
@@ -312,6 +313,10 @@ void taskSyncServoDriver(timeUs_t currentTimeUs)
     sbusServoSendUpdate();
 #endif
 
+#if defined(USE_DDSM_MOTOR)
+    ddsmUpdate();
+#endif
+
 }
 
 #ifdef USE_OSD
@@ -403,6 +408,9 @@ void fcTasksInit(void)
 #endif
 #if defined(USE_SERVO_SBUS)
     setTaskEnabled(TASK_PWMDRIVER, (servoConfig()->servo_protocol == SERVO_TYPE_SBUS) || (servoConfig()->servo_protocol == SERVO_TYPE_SBUS_PWM));
+#endif
+#if defined(USE_DDSM_MOTOR)
+    setTaskEnabled(TASK_PWMDRIVER, (servoConfig()->servo_protocol == SERVO_TYPE_DDSM) || (servoConfig()->servo_protocol == SERVO_TYPE_DDSM_PWM));
 #endif
 #ifdef USE_CMS
 #ifdef USE_MSP_DISPLAYPORT
