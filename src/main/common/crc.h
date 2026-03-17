@@ -29,6 +29,8 @@ uint8_t crc8_dvb_s2(uint8_t crc, unsigned char a);
 uint8_t crc8_dvb_s2_update(uint8_t crc, const void *data, uint32_t length);
 void crc8_dvb_s2_sbuf_append(struct sbuf_s *dst, uint8_t *start);
 
+uint8_t crc8_maxim(uint8_t crc, unsigned char a);
+
 uint8_t crc8_xor_update(uint8_t crc, const void *data, uint32_t length);
 void crc8_xor_sbuf_append(struct sbuf_s *dst, uint8_t *start);
 
