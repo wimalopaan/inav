@@ -115,19 +115,20 @@ static void frame_crc(ddsmFrame_t* const frame) {
     frame->crc8 = crc;
 }
 
-static void fillDdsmVelocityFrame(ddsmFrame_t* const frame, int16_t const velocity)
+static void fillDdsmVelocityFrame(ddsmFrame_t* const frame, int16_t const velocity) // [-2100;2100]
 {
+    const int16_t velocity_constrained = constrain(velocity, -2100, 2100);
     frame->id = 0x01;
     frame->cmd = 0x64;
-    frame->data[0] = velocity >> 8;
-    frame->data[1] = velocity;
+    frame->data[0] = velocity_constrained >> 8;
+    frame->data[1] = velocity_constrained;
     frame_crc(frame);
 }
 
 void ddsmSet(uint8_t const index, uint16_t const value)
 {
     if ((index == 0) && (ddsmPorts[0].port)) {
-        const int16_t velocity = value - 1500;
+        const int16_t velocity = 2100.0f * ((value - 1500.0f) / 500.0f);
         fillDdsmVelocityFrame(&ddsmPorts[0].frame, velocity);      
     }
 }
