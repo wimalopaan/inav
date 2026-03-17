@@ -55,6 +55,19 @@ void crc16_ccitt_sbuf_append(sbuf_t *dst, uint8_t *start)
     sbufWriteU16(dst, crc);
 }
 
+uint8_t crc8_maxim(uint8_t crc, unsigned char a)
+{
+	crc = crc ^ a;
+	for (uint8_t i = 0; i < 8; ++i) {
+		if (crc & 0x01) {
+			crc = (crc >> 1) ^ 0x8c;
+		} else {
+			crc >>= 1;
+		}
+	}
+    return crc;
+}
+
 uint8_t crc8_dvb_s2(uint8_t crc, unsigned char a)
 {
     crc ^= a;
