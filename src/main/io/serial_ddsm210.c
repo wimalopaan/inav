@@ -47,15 +47,15 @@
 #define MAX_DDSM_PORT_COUNT 2
 
 typedef struct ddsmFrame_s {
-  uint8_t id;
-  uint8_t cmd;
-  uint8_t data[7];
-  uint8_t crc8;
+    uint8_t id;
+    uint8_t cmd;
+    uint8_t data[7];
+    uint8_t crc8;
 } ddsmFrame_t;
 
 typedef struct ddsmPort_s {
-  serialPort_t *port;
-  ddsmFrame_t frame;
+    serialPort_t *port;
+    ddsmFrame_t frame;
 } ddsmPort_t;
 
 static ddsmPort_t ddsmPorts[MAX_DDSM_PORT_COUNT];
@@ -63,7 +63,7 @@ static ddsmPort_t ddsmPorts[MAX_DDSM_PORT_COUNT];
 static void resetDdsmPort(ddsmPort_t * const ddsmPortToReset, serialPort_t * const serialPort)
 {
     if (!ddsmPortToReset) {
-      return;
+        return;
     }
     memset(ddsmPortToReset, 0, sizeof(ddsmPort_t));
     ddsmPortToReset->port = serialPort;
@@ -71,7 +71,7 @@ static void resetDdsmPort(ddsmPort_t * const ddsmPortToReset, serialPort_t * con
 
 static void clearDdsmFrame(ddsmFrame_t* const frame) {
     if (!frame) {
-      return;
+        return;
     }
     memset(frame, 0, sizeof(ddsmFrame_t));
 }
@@ -86,14 +86,14 @@ static void ddsmAllocatePorts(void)
             portIndex++;
             continue;
         }
-
+        
         serialPort_t * const serialPort = openSerialPort(portConfig->identifier, FUNCTION_DDSM_SERIAL, NULL, NULL, DDSM_UART_BAUD, MODE_TX, DDSM_UART_OPTIONS);
         if (serialPort) {
             resetDdsmPort(ddsmPort, serialPort);
             clearDdsmFrame(&ddsmPort->frame);
             portIndex++;
         }
-
+        
         portConfig = findNextSerialPortConfig(FUNCTION_DDSM_SERIAL);
     }
 }
@@ -105,31 +105,49 @@ bool ddsmInitialize(void)
     return true;
 }
 
+static void frame_crc(ddsmFrame_t* const frame) {
+    uint8_t crc = 0;
+    crc = crc8_maxim(crc, frame->id);
+    crc = crc8_maxim(crc, frame->cmd);
+    for(uint8_t i = 0; i < 7; ++i) {
+        crc = crc8_maxim(crc, frame->data[i]);    
+    }
+    frame->crc8 = crc;
+}
+
+static void fillDdsmVelocityFrame(ddsmFrame_t* const frame, int16_t const velocity)
+{
+    frame->id = 0x01;
+    frame->cmd = 0x64;
+    frame->data[0] = velocity >> 8;
+    frame->data[1] = velocity;
+    frame_crc(frame);
+}
+
 void ddsmSet(uint8_t const index, uint16_t const value)
 {
-    for(ddsmPort_t* ddsmPort = &ddsmPorts[0]; (ddsmPort && (ddsmPort != &ddsmPorts[MAX_DDSM_PORT_COUNT])); ++ddsmPort) {
-      
-      
-
+    if ((index == 0) && (ddsmPorts[0].port)) {
+        const int16_t velocity = value - 1500;
+        fillDdsmVelocityFrame(&ddsmPorts[0].frame, velocity);      
     }
 }
 
 void ddsmUpdate(void)
 {
-    for(const ddsmPort_t* ddsmPort = &ddsmPorts[0]; (ddsmPort && (ddsmPort != &ddsmPorts[MAX_DDSM_PORT_COUNT])); ++ddsmPort)
+    for(const ddsmPort_t* ddsmPort = &ddsmPorts[0]; (ddsmPort != &ddsmPorts[MAX_DDSM_PORT_COUNT]); ++ddsmPort)
     {
-      if (!ddsmPort->port) {
-        continue;
-      }
-      if (!isSerialTransmitBufferEmpty(ddsmPort->port)) {
-          continue;
-      }
-      else {
-        const uint8_t * const data =  (const uint8_t *)&ddsmPort->frame;
-        if (data) {
-          serialWriteBuf(ddsmPort->port, data, sizeof(ddsmFrame_t));
+        if (!ddsmPort->port) {
+            continue;
         }
-      }
+        if (!isSerialTransmitBufferEmpty(ddsmPort->port)) {
+            continue;
+        }
+        else {
+            const uint8_t * const data =  (const uint8_t *)&ddsmPort->frame;
+            if (data) {
+                serialWriteBuf(ddsmPort->port, data, sizeof(ddsmFrame_t));
+            }
+        }
     }
 }
 
