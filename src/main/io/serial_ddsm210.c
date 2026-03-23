@@ -34,10 +34,21 @@
 #include "build/build_config.h"
 #include "build/debug.h"
 
+#include "fc/rc_modes.h"
+#include "fc/rc_controls.h"
+
+#include "flight/imu.h"
+#include "flight/mixer.h"
+#include "flight/pid.h"
+
 #include "common/maths.h"
 #include "common/crc.h"
 
+#include "programming/pid.h"
+
 #include "io/serial.h"
+
+#include "rx/rx.h"
 
 #if defined(USE_DDSM_MOTOR)
 
@@ -127,9 +138,30 @@ static void fillDdsmVelocityFrame(ddsmFrame_t* const frame, int16_t const veloci
 
 void ddsmSet(uint8_t const index, uint16_t const value)
 {
-    if ((index == 0) && (ddsmPorts[0].port)) {
-        const int16_t velocity = 2100.0f * ((value - 1500.0f) / 500.0f);
-        fillDdsmVelocityFrame(&ddsmPorts[0].frame, velocity);      
+    (void) value;
+    (void) index;
+
+    // const int16_t thr = (mixerThrottleCommand - 1500); // throttle 
+    
+    int16_t velocity = programmingPidState[0].output;
+    int16_t ail = 0;    
+    
+    if (FLIGHT_MODE(MANUAL_MODE)) {
+        ail = rcCommand[YAW] / 2; // +-500
+    } else {
+        ail = axisPID[YAW] / 2;
+    }
+    
+    if (!IS_RC_MODE_ACTIVE(BOXARM)) {
+        velocity = 0;
+        ail = 0;
+    }
+    
+    if (ddsmPorts[0].port) {
+        fillDdsmVelocityFrame(&ddsmPorts[0].frame, velocity + ail);      
+    }
+    if (ddsmPorts[1].port) {
+        fillDdsmVelocityFrame(&ddsmPorts[1].frame, -velocity + ail);      
     }
 }
 

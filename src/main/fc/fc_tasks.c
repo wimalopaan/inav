@@ -643,7 +643,7 @@ cfTask_t cfTasks[TASK_COUNT] = {
     [TASK_PWMDRIVER] = {
         .taskName = "SERVOS",
         .taskFunc = taskSyncServoDriver,
-        .desiredPeriod = TASK_PERIOD_HZ(200),         // 200 Hz
+        .desiredPeriod = TASK_PERIOD_HZ(450),         // 200 Hz
         .staticPriority = TASK_PRIORITY_HIGH,
     },
 #endif
@@ -705,7 +705,8 @@ cfTask_t cfTasks[TASK_COUNT] = {
     [TASK_PROGRAMMING_FRAMEWORK] = {
         .taskName = "PROGRAMMING",
         .taskFunc = programmingFrameworkUpdateTask,
-        .desiredPeriod = TASK_PERIOD_HZ(10),          // 10Hz @100msec
+        // .desiredPeriod = TASK_PERIOD_HZ(10),          // 10Hz @100msec
+        .desiredPeriod = TASK_PERIOD_HZ(4000),          // 10Hz @100msec
         .staticPriority = TASK_PRIORITY_IDLE,
     },
 #endif

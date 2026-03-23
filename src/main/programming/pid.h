@@ -46,7 +46,11 @@ PG_DECLARE_ARRAY(programmingPid_t, MAX_PROGRAMMING_PID_COUNT, programmingPids);
 typedef struct programmingPidState_s {
     pidController_t controller;
     float output;
+    // pt1Filter_t outfilter;
+    // pt1Filter_t pitchfilter;
 } programmingPidState_t;
+
+extern EXTENDED_FASTRAM programmingPidState_t programmingPidState[MAX_PROGRAMMING_PID_COUNT];
 
 void programmingPidUpdateTask(timeUs_t currentTimeUs);
 void programmingPidInit(void);

@@ -821,7 +821,8 @@ static int logicConditionGetFlightOperandValue(int operand) {
             break;
 
         case LOGIC_CONDITION_OPERAND_FLIGHT_ATTITUDE_PITCH: // deg
-            return constrain(attitude.values.pitch / 10, -180, 180);
+            // return constrain(attitude.values.pitch / 10, -180, 180);
+            return constrain(attitude.values.pitch, -1800, 1800);
             break;
 
         case LOGIC_CONDITION_OPERAND_FLIGHT_ATTITUDE_YAW: // deg
