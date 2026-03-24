@@ -141,8 +141,6 @@ void ddsmSet(uint8_t const index, uint16_t const value)
     (void) value;
     (void) index;
 
-    // const int16_t thr = (mixerThrottleCommand - 1500); // throttle 
-    
     int16_t velocity = programmingPidState[0].output;
     int16_t ail = 0;    
     

@@ -73,98 +73,21 @@ void pgResetFn_programmingPids(programmingPid_t *instance)
 }
 
 // todo:
-// eigene PID Controller für balance-bot
-// mit der hohen update Frequenz
-// LQR
+// - define/use own fast-update PID for balancing bot
+// - leave normal PID as is
+// - implmement LQR
 
-// void programmingPidUpdateTask_old(timeUs_t currentTimeUs)
-// {
-//     static bool active = false;
-//     static timeUs_t previousUpdateTimeUs;
-//     const float dT = US2S(currentTimeUs - previousUpdateTimeUs);
-    
-//     if (!pidsInitiated) {
-//         programmingPidInit();
-//         pidsInitiated = true;
-//     }
+// special version of PIDs
+// output limited to +-2100
+// if measurement (pitch-angle) > 30° --> deactivate (should be a logic condition)
 
-//     const int16_t thr = (mixerThrottleCommand - 1500) / 15; // throttle 
-    
-//     debug[2] = mixerThrottleCommand;
-    
-//     for (uint8_t i = 0; i < MAX_PROGRAMMING_PID_COUNT; i++) {
-//         if (programmingPids(i)->enabled) {
-//             int setpoint = logicConditionGetOperandValue(programmingPids(i)->setpoint.type, programmingPids(i)->setpoint.value);
-//             setpoint += thr;
-            
-//             const int measurement = logicConditionGetOperandValue(programmingPids(i)->measurement.type, programmingPids(i)->measurement.value);
-
-//             if (active) {
-//                 if (abs(measurement) > 300) { // 30deg
-//                     active = false;
-//                 }
-//             }
-//             else {
-//                 if (abs(measurement) < 30) { // 3deg
-//                     active = true;
-//                 }                
-//             }
-            
-//             if (!active) { // 30deg
-//                 programmingPidState[i].output = 0;
-//                 programmingPidState[i].outfilter.state = 0;
-//             }
-//             else {
-//                 const float mf = pt1FilterApply(&programmingPidState[i].pitchfilter, measurement);
-//                 float m1 = mf;
-//                 float expo = (mf * mf) / (1000 - programmingPids(i)->gains.FF);
-//                 if (mf >= 0) {
-//                     m1 += expo;
-//                 }
-//                 else {
-//                     m1 -= expo;                
-//                 }
-                
-//                 float v1 = navPidApply2(
-//                     &programmingPidState[i].controller,
-//                     setpoint,
-//                     m1,
-//                     dT,
-//                     -1000,
-//                     1000,
-//                     PID_LIMIT_INTEGRATOR
-//                 );
-                
-//                 programmingPidState[i].output = v1;
-//                 pt1FilterApply(&programmingPidState[i].outfilter, v1);
-                
-//             }
-            
-//         }
-//     }
-
-//     previousUpdateTimeUs = currentTimeUs;
-// }
-
-// void programmingPidInit_old(void)
-// {
-//     for (uint8_t i = 0; i < MAX_PROGRAMMING_PID_COUNT; i++) {
-//         navPidInit(
-//             &programmingPidState[i].controller,
-//             programmingPids(i)->gains.P / 1000.0f,
-//             programmingPids(i)->gains.I / 1000.0f,
-//             programmingPids(i)->gains.D / 1000.0f,
-//             0.0f,
-//             // programmingPids(i)->gains.FF / 1000.0f,
-//             5.0f,
-//             0.0f
-//         );
-//         programmingPidState[i].outfilter.alpha = 0.25f;
-//         programmingPidState[i].outfilter.state = 0.0f;
-//         programmingPidState[i].pitchfilter.alpha = 0.001f;
-//         programmingPidState[i].pitchfilter.state = 0.0f;
-//     }
-// }
+// gvar[0] = PID[0].gain
+// gvar[1] = PID[0].errorLpfFc
+// gvar[2] = PID[0].dtermLpfFc
+// gvar[3] = PID[1].gain
+// gvar[4] = PID[1].errorLpfFc
+// gvar[5] = PID[1].dtermLpfFc
+// gvar[6] = max. PID[1] output value (should be gvar[12])
 
 void programmingPidUpdateTask(timeUs_t currentTimeUs)
 {
@@ -180,8 +103,6 @@ void programmingPidUpdateTask(timeUs_t currentTimeUs)
         pidsInitiated = true;
     }
 
-    // const int16_t thr = (mixerThrottleCommand - 1500) / 8; // throttle 
-    
     for (uint8_t i = 0; i < MAX_PROGRAMMING_PID_COUNT; i++) {
         if (programmingPids(i)->enabled) {
  
@@ -202,8 +123,6 @@ void programmingPidUpdateTask(timeUs_t currentTimeUs)
             
             int setpoint = logicConditionGetOperandValue(programmingPids(i)->setpoint.type, programmingPids(i)->setpoint.value);
 
-            // setpoint += thr;
-            
             const int measurement = logicConditionGetOperandValue(programmingPids(i)->measurement.type, programmingPids(i)->measurement.value);
 
             if (i == 0) { // special treatment
@@ -239,14 +158,6 @@ void programmingPidUpdateTask(timeUs_t currentTimeUs)
                     gain,
                     1.0f // dTerm Scaler (additional to gain)
                 );
-                // debug[0] = setpoint;
-                // debug[1] = programmingPidState[i].controller.errorLpfHz;
-                // debug[2] = programmingPidState[i].controller.proportional;
-                // debug[3] = programmingPidState[i].controller.integrator;
-                // debug[4] = programmingPidState[i].controller.derivative;
-                // debug[5] = programmingPidState[i].controller.feedForward;
-                // debug[6] = programmingPidState[i].controller.output_constrained;
-                // debug[7] = thr;
             }
         }
     }
