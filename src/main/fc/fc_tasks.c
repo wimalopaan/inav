@@ -72,6 +72,7 @@
 #include "io/osd_dji_hd.h"
 #include "io/displayport_msp_osd.h"
 #include "io/servo_sbus.h"
+#include "io/serial_vesc.h"
 #include "io/adsb.h"
 
 #include "msp/msp_serial.h"
@@ -295,6 +296,14 @@ void taskSmartportMaster(timeUs_t currentTimeUs)
 }
 #endif
 
+#if defined(USE_SERVO_VESC)
+void taskVescMaster(timeUs_t currentTimeUs)
+{
+    vescMasterHandle(currentTimeUs);
+}
+
+#endif
+
 #ifdef USE_LED_STRIP
 void taskLedStrip(timeUs_t currentTimeUs)
 {
@@ -434,6 +443,9 @@ void fcTasksInit(void)
 #endif
 #if defined(USE_SMARTPORT_MASTER)
     setTaskEnabled(TASK_SMARTPORT_MASTER, true);
+#endif
+#if defined(USE_SERVO_VESC)
+    setTaskEnabled(TASK_VESC, (servoConfig()->servo_protocol == SERVO_TYPE_VESC) || (servoConfig()->servo_protocol == SERVO_TYPE_VESC_PWM) || (motorConfig()->motorPwmProtocol == PWM_TYPE_VESC));
 #endif
 
 #ifdef USE_SERIAL_GIMBAL
@@ -622,7 +634,16 @@ cfTask_t cfTasks[TASK_COUNT] = {
     },
 #endif
 
-#ifdef USE_LED_STRIP
+#if defined(USE_SERVO_VESC)
+    [TASK_VESC] = {
+        .taskName = "VESC",
+        .taskFunc = taskVescMaster,
+        .desiredPeriod = TASK_PERIOD_HZ(100),         // 100 Hz
+        .staticPriority = TASK_PRIORITY_IDLE,
+    },
+#endif    
+
+    #ifdef USE_LED_STRIP
     [TASK_LEDSTRIP] = {
         .taskName = "LEDSTRIP",
         .taskFunc = taskLedStrip,

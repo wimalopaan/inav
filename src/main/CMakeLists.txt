@@ -362,6 +362,8 @@ main_sources(COMMON_SRC
     io/beeper.h
     io/servo_sbus.c
     io/servo_sbus.h
+    io/serial_vesc.c
+    io/serial_vesc.h
     io/frsky_osd.c
     io/frsky_osd.h
     io/gimbal_serial.c

@@ -45,12 +45,19 @@ typedef enum {
     PWM_TYPE_DSHOT150,
     PWM_TYPE_DSHOT300,
     PWM_TYPE_DSHOT600,
+#if defined(USE_SERVO_VESC)
+    PWM_TYPE_VESC,
+#endif
 } motorPwmProtocolTypes_e;
 
 typedef enum {
     SERVO_TYPE_PWM = 0,
     SERVO_TYPE_SBUS,
-    SERVO_TYPE_SBUS_PWM
+    SERVO_TYPE_SBUS_PWM,
+#if defined(USE_SERVO_VESC)
+    SERVO_TYPE_VESC,
+    SERVO_TYPE_VESC_PWM,
+#endif
 } servoProtocolType_e;
 
 typedef enum {

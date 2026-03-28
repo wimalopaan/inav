@@ -35,6 +35,9 @@
 #include "drivers/pwm_mapping.h"
 #include "drivers/pwm_output.h"
 #include "io/servo_sbus.h"
+#if defined(USE_SERVO_VESC)
+#include "io/serial_vesc.h"
+#endif
 #include "sensors/esc_sensor.h"
 
 #include "config/feature.h"
@@ -557,6 +560,12 @@ void pwmMotorPreconfigure(void)
             motorWritePtr = pwmWriteDigital;
             break;
 #endif
+#ifdef USE_SERVO_VESC
+    case PWM_TYPE_VESC:
+        vescInitialize();
+        motorWritePtr = vescSet;
+        break;
+#endif
     }
 }
 
@@ -651,6 +660,14 @@ static void sbusPwmWriteStandard(uint8_t index, uint16_t value)
 }
 #endif
 
+#ifdef USE_SERVO_VESC
+static void vescPwmWriteStandard(uint8_t index, uint16_t value)
+{
+    pwmServoWriteStandard(index, value);
+    vescSet(index, value);
+}
+#endif
+
 void pwmServoPreconfigure(void)
 {
     // Protocol-specific configuration
@@ -670,6 +687,17 @@ void pwmServoPreconfigure(void)
             sbusServoInitialize();
             servoWritePtr = sbusPwmWriteStandard;
             break;
+#endif
+#ifdef USE_SERVO_VESC
+    case SERVO_TYPE_VESC:
+        vescInitialize();
+        servoWritePtr = vescSet;
+        break;
+
+    case SERVO_TYPE_VESC_PWM:
+        vescInitialize();
+        servoWritePtr = vescPwmWriteStandard;
+        break;
 #endif
     }
 }

@@ -49,6 +49,7 @@
 
 #include "io/gps.h"
 #include "io/serial.h"
+#include "io/serial_vesc.h"
 
 #include "navigation/navigation.h"
 
@@ -170,6 +171,23 @@ static void crsfSerialize32(sbuf_t *dst, uint32_t v)
     crsfSerialize8(dst, (v >> 8));
     crsfSerialize8(dst, (uint8_t)v);
 }
+
+#ifdef USE_SERVO_VESC
+static void crsfSerialize16i(sbuf_t *dst, int16_t v)
+{
+    // Use BigEndian format
+    crsfSerialize8(dst,  (v >> 8));
+    crsfSerialize8(dst, (uint8_t)v);
+}
+
+static void crsfSerialize24i(sbuf_t *dst, int32_t v)
+{
+    // Use BigEndian format
+    crsfSerialize8(dst,  (v >> 16));
+    crsfSerialize8(dst,  (v >> 8));
+    crsfSerialize8(dst, (uint8_t)v);
+}
+#endif
 
 static void crsfSerializeData(sbuf_t *dst, const uint8_t *data, int len)
 {
@@ -295,6 +313,26 @@ static void crsfBarometerAltitude(sbuf_t *dst)
     crsfSerialize8(dst, CRSF_FRAMETYPE_BAROMETER_ALTITUDE);
     crsfSerialize16(dst, altitude_packed);
 }
+
+#ifdef USE_SERVO_VESC
+static void crsfRpm(sbuf_t *dst)
+{
+    sbufWriteU8(dst, 2 * 3 + 1 + CRSF_FRAME_LENGTH_TYPE_CRC); 
+    crsfSerialize8(dst, CRSF_FRAMETYPE_RPM);
+    crsfSerialize8(dst, 1);
+    crsfSerialize24i(dst, vescRpm(0));
+    crsfSerialize24i(dst, vescRpm(1));
+}
+
+static void crsfTemp(sbuf_t *dst)
+{
+    sbufWriteU8(dst, 2 * 2 + 1 + CRSF_FRAME_LENGTH_TYPE_CRC);
+    crsfSerialize8(dst, CRSF_FRAMETYPE_TEMP);
+    crsfSerialize8(dst, 1);
+    crsfSerialize16i(dst, vescTemp(0));
+    crsfSerialize16i(dst, vescTemp(1));
+}
+#endif
 
 typedef enum {
     CRSF_ACTIVE_ANTENNA1 = 0,
@@ -465,6 +503,8 @@ typedef enum {
     CRSF_FRAME_GPS_INDEX,
     CRSF_FRAME_VARIO_SENSOR_INDEX,
     CRSF_FRAME_BAROMETER_ALTITUDE_INDEX,
+    CRSF_FRAME_RPM_INDEX,
+    CRSF_FRAME_TEMP_INDEX,
     CRSF_SCHEDULE_COUNT_MAX
 } crsfFrameTypeIndex_e;
 
@@ -545,6 +585,18 @@ static void processCrsf(void)
         crsfFinalize(dst);
     }
 #endif
+#ifdef USE_SERVO_VESC
+    if (currentSchedule & BV(CRSF_FRAME_RPM_INDEX)) {
+        crsfInitializeFrame(dst);
+        crsfRpm(dst);
+        crsfFinalize(dst);
+    }
+    if (currentSchedule & BV(CRSF_FRAME_TEMP_INDEX)) {
+        crsfInitializeFrame(dst);
+        crsfTemp(dst);
+        crsfFinalize(dst);
+    }
+#endif
     crsfScheduleIndex = (crsfScheduleIndex + 1) % crsfScheduleCount;
 }
 
@@ -582,6 +634,10 @@ void initCrsfTelemetry(void)
     if (sensors(SENSOR_BARO)) {
         crsfSchedule[index++] = BV(CRSF_FRAME_BAROMETER_ALTITUDE_INDEX);
     }
+#endif
+#ifdef USE_SERVO_VESC
+    crsfSchedule[index++] = BV(CRSF_FRAME_RPM_INDEX);
+    crsfSchedule[index++] = BV(CRSF_FRAME_TEMP_INDEX);
 #endif
     crsfScheduleCount = (uint8_t)index;
 }

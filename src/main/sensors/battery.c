@@ -34,6 +34,7 @@
 
 #include "drivers/adc.h"
 #include "drivers/time.h"
+#include "drivers/pwm_mapping.h"
 
 #include "fc/config.h"
 #include "fc/control_profile.h"
@@ -58,6 +59,7 @@
 #include "fc/rc_controls.h"
 
 #include "io/beeper.h"
+#include "io/serial_vesc.h"
 
 #if defined(USE_FAKE_BATT_SENSOR)
 #include "sensors/battery_sensor_fake.h"
@@ -283,7 +285,16 @@ static void updateBatteryVoltage(timeUs_t timeDelta, bool justConnected)
                     vbat = escSensor->voltage;
                 }
                 else {
+#if defined(USE_SERVO_VESC)
+                    if (motorConfig()->motorPwmProtocol == PWM_TYPE_VESC) {
+                        vbat = vescVoltage() * 10;
+                    }
+                    else {
+                        vbat = 0;
+                    }
+#else
                     vbat = 0;
+#endif
                 }
             }
             break;
@@ -609,7 +620,16 @@ void currentMeterUpdate(timeUs_t timeDelta)
                     amperage = pt1FilterApply4(&amperageFilterState, escSensor->current, AMPERAGE_LPF_FREQ, US2S(timeDelta));
                 }
                 else {
+#if defined(USE_SERVO_VESC)
+                    if (motorConfig()->motorPwmProtocol == PWM_TYPE_VESC) {
+                        amperage = vescCurrent();
+                    }
+                    else {
+                        amperage = 0;
+                    }
+#else
                     amperage = 0;
+#endif
                 }
             }
             break;
