@@ -37,14 +37,23 @@
 #include "common/maths.h"
 #include "common/crc.h"
 
+#include "config/parameter_group.h"
+#include "config/parameter_group_ids.h"
+
 #include "io/serial.h"
+#include "io/serial_vesc.h"
 
 #if defined(USE_SERVO_VESC)
 
 #define VESC_UART_BAUD                  115200
-#define VESC_UART_OPTIONS              (SERIAL_UNIDIR)
 
 #define MAX_VESC_PORT_COUNT 2
+
+PG_REGISTER_WITH_RESET_TEMPLATE(vescMasterConfig_t, vescMasterConfig, PG_VESC_MASTER_CONFIG, 0);
+
+PG_RESET_TEMPLATE(vescMasterConfig_t, vescMasterConfig,
+    .halfDuplex = true,
+);
 
 typedef enum CommPacketId {
     COMM_FW_VERSION = 0,
@@ -322,8 +331,9 @@ static void vescAllocatePorts(void) {
             portIndex++;
             continue;
         }
-        
-        serialPort_t * const serialPort = openSerialPort(portConfig->identifier, FUNCTION_VESC, NULL, NULL, VESC_UART_BAUD, MODE_RXTX, VESC_UART_OPTIONS);
+
+        const portOptions_t portOptions = (vescMasterConfig()->halfDuplex ? SERIAL_BIDIR : SERIAL_UNIDIR);
+        serialPort_t * const serialPort = openSerialPort(portConfig->identifier, FUNCTION_VESC, NULL, NULL, VESC_UART_BAUD, MODE_RXTX, portOptions);
         if (serialPort) {
             resetVescPort(vescPort, serialPort);
             clearVescFrame(&vescPort->frames);
@@ -461,27 +471,39 @@ static void vescProcess(vescPort_t* const port, const uint8_t b) {
         if (b == 0x02) {
             port->process.state = Process_Length;
         }
-        else {
-            port->process.state = Process_WaitForREsponse;
-        }
         break;
     case Process_Length:
         port->process.length = b;
         port->process.csum = 0;
-        port->process.state = Process_Type;
+        if ((port->process.length > 4) && (port->process.length < 80)) {
+            port->process.state = Process_Type;
+        }
+        else {
+            port->process.state = Process_WaitForREsponse;            
+        }
         break;
     case Process_Type:
         --port->process.length;
         port->process.csum = crc16_ccitt(port->process.csum, b);
         port->process.type = b;
         port->process.counter = 0;
-        port->process.state = Process_Data;
+        if (port->process.type <= COMM_LISP_REPL_CMD) {
+            port->process.state = Process_Data;
+        }
+        else {
+            port->process.state = Process_WaitForREsponse;            
+        }        
         break;
     case Process_Data:
         port->process.csum = crc16_ccitt(port->process.csum, b);
-        port->process.data[port->process.counter++] = b;
-        if (port->process.counter == port->process.length) {
-            port->process.state = Process_CrcH;
+        if (port->process.counter < sizeof(port->process.data)) {
+            port->process.data[port->process.counter++] = b;
+            if (port->process.counter == port->process.length) {
+                port->process.state = Process_CrcH;
+            }
+        }
+        else {
+            port->process.state = Process_WaitForREsponse;
         }
         break;
     case Process_CrcH:

@@ -31,6 +31,12 @@
 
 #ifdef USE_SERVO_VESC
 
+typedef struct {
+    bool halfDuplex;
+} vescMasterConfig_t;
+
+PG_DECLARE(vescMasterConfig_t, vescMasterConfig);
+
 bool vescInitialize(void);
 void vescSet(uint8_t index, uint16_t value);
 void vescMasterHandle(timeUs_t); // @100Hz

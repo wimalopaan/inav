@@ -4186,6 +4186,16 @@ groups:
         type: bool
         default_value: OFF
 
+  - name: PG_VESC_MASTER_CONFIG
+    type: vescMasterConfig_t
+    headers: ["io/serial_vesc.h"]
+    condition: USE_SERVO_VESC
+    members:
+      - name: vesc_master_halfduplex
+        field: halfDuplex
+        type: bool
+        default_value: ON
+
   - name: PG_DJI_OSD_CONFIG
     type: djiOsdConfig_t
     headers: ["io/osd_dji_hd.h"]
